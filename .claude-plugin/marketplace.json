@@ -6,8 +6,8 @@
     {
       "name": "gemeinde-dev",
       "source": "./plugins/gemeinde-dev",
-      "description": "Shared Claude Code skills for the VGC Gemeinde projects (gemeinde-tours, gemeinde-tippspiel, buli-hub)",
-      "version": "1.0.0"
+      "description": "Shared Claude Code skills for the VGC Gemeinde projects (gemeinde-tours, buli-hub)",
+      "version": "1.0.1"
     }
   ]
 }

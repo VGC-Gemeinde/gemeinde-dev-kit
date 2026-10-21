@@ -1,8 +1,8 @@
 # gemeinde-dev-kit
 
-Shared development tooling of the VGC Gemeinde projects (`gemeinde-tours`, `gemeinde-tippspiel`,
-`buli-hub`): one place for the Spec Kit workflow and the Claude Code skills, so the projects stay
-alike and a fix lands everywhere.
+Shared development tooling of the VGC Gemeinde projects (`gemeinde-tours`, `buli-hub`): one place
+for the Spec Kit workflow and the Claude Code skills, so the projects stay alike and a fix lands
+everywhere.
 
 | Part | What it is | Where |
 |---|---|---|

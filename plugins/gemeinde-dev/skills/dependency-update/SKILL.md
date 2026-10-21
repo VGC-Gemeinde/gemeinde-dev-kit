@@ -1,6 +1,6 @@
 ---
 name: dependency-update
-description: Update the dependencies of the VGC Gemeinde repos (gemeinde-tours, gemeinde-tippspiel, buli-hub) to their latest versions by hand — npm packages, Docker base images, GitHub Actions and the Supabase CLI — with per-repo verification. Use when asked to update, upgrade or modernise dependencies in any of these repos; it replaces Renovate, which is switched off.
+description: Update the dependencies of the VGC Gemeinde repos (gemeinde-tours, buli-hub) to their latest versions by hand — npm packages, Docker and Postgres images, GitHub Actions — with per-repo verification. Use when asked to update, upgrade or modernise dependencies in any of these repos; it replaces Renovate, which is switched off.
 ---
 
 # Dependency update
@@ -13,25 +13,26 @@ Repos, under `~/Projects/`:
 | Repo | Branch | Remote | Extra |
 |---|---|---|---|
 | `gemeinde-tours` | `master` | GitHub | static export + nginx image; ingest pipeline |
-| `gemeinde-tippspiel` | `master` | GitHub (private) | standalone Next on Cloud Run |
-| `buli-hub` | `dev` | GitHub; push to `dev` deploys staging | GitHub Actions, local Supabase stack, Supabase CLI |
+| `buli-hub` | `dev` | GitHub; push to `dev` deploys staging | GitHub Actions, Postgres via `docker compose` locally and Cloud SQL in production |
 
-Order: smallest first (tours → tippspiel → buli-hub), so a major's surprises show up where
-they are cheapest.
+gemeinde-tippspiel is offline and its repository archived (2026-10-21); it is not updated.
+
+Order: smallest first (tours → buli-hub), so a major's surprises show up where they are
+cheapest.
 
 ## 0. Before touching anything
 
 - Run `ListAgents` and `git status` in each repo. Other Claude sessions work in these repos in
   parallel. **Never `git add -A`**; stage explicit paths only, and leave changes you did not
   make alone. A swept-in file once got pushed to `dev` and broke CI.
-- Present a plan before changing anything (all three repos require it): the version table,
+- Present a plan before changing anything (both repos require it): the version table,
   which jumps are majors, and the decisions below.
 
 ## 1. Inventory
 
 Per repo: `npm outdated`, `npm audit`, the `FROM` lines in `Dockerfile`, and for buli-hub
-`grep -n 'uses:' .github/workflows/*.yml` plus the Supabase CLI pin in `ci.yml` and
-`supabase --version`. For every major, read the release notes (`gh api
+`grep -n 'uses:' .github/workflows/*.yml` (its own `.github/actions/` too) and the `postgres:`
+images in `compose.yaml` and `ci.yml`. For every major, read the release notes (`gh api
 repos/<owner>/<repo>/releases/tags/<tag> --jq .body`, or a web search) and grep the repo for the
 APIs or inputs they break.
 
@@ -51,10 +52,10 @@ APIs or inputs they break.
 - **Base images:** nginx follows its newest line (`nginx:<x.y>-alpine`); no digest pinning
   (pure upkeep without a bot).
 - **GitHub Actions:** newest major, after checking that the inputs in use still exist.
-- **Supabase CLI** (buli-hub): local binary and CI pin move together. Install from the GitHub
-  release, verify `checksums.txt`, keep the old binary as backup. `supabase stop` keeps the data
-  volume; `supabase start` on the new CLI restores from it. Apply config renames the CLI warns
-  about. Ask before anything that needs `db reset` — it wipes local data.
+- **Postgres** (buli-hub): the `postgres:<major>` images in `compose.yaml` (local) and the CI
+  service container follow the Cloud SQL major in production, never ahead of it. A new major is a
+  Cloud SQL upgrade first, its own change. Ask before anything that needs `npm run db:reset`: it
+  wipes local data.
 
 ## 3. Majors that needed care
 
@@ -83,18 +84,15 @@ pre-update commit in a temporary `git worktree` to tell regressions from old pro
   routes, one `/team/<player>` page and a 404. Re-run
   `npm run ingest -- <slug> --offline` and diff the output against the previous file: only
   `ingestedAt` may change.
-- **tippspiel:** `docker build` needs `--build-arg NEXT_PUBLIC_SUPABASE_URL=…
-  --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=…` (values from `.env`); `/` answers 200,
-  protected pages redirect. Check the image holds only runtime files.
-- **buli-hub:** tests need the local Supabase stack running (`supabase status`). Image build
-  takes the same two build args; run with `--network host --env-file .env`. Routes that 404
+- **buli-hub:** integration tests need the local stack (`npm run db:start`) and truncate it, so
+  ask first. Build the image, run it with `--network host --env-file .env`. Routes that 404
   locally because of the season phase (`/spielplan`, `/playoffs`, `/relegation`) are expected.
 
 ## 5. Commit and ship
 
 - One commit per repo, only after the maintainer approves; explicit paths; commit message in
   the repo's style (buli-hub: German titles).
-- tours and tippspiel: push `master` when approved.
+- tours: push `master` when approved.
 - buli-hub: a push to `dev` runs CI and deploys staging — the only real test of Action bumps.
   Watch it (`gh run watch <id>` in the background) and read failures with
   `gh run view <id> --log-failed`. Re-run a job only when the failure is clearly external.
